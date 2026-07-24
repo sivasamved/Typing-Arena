@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Typing Arena - Modern Speed Typing App</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons & Confetti -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+  <style>
+    :root {
+      --font-sans: 'Outfit', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      --bg-dark: #0f172a;
+      --bg-card: #1e293b;
+      --bg-card-hover: #334155;
+      
+      --accent-indigo: #6366f1;
+      --accent-teal: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --accent-amber: #f59e0b;
+      --accent-cursor: #38bdf8;
+
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --radius-lg: 20px;
+      --radius-md: 14px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 85% 75%, rgba(6, 182, 212, 0.1) 0%, transparent 45%);
+    }
+
+    .app-container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-indigo), #4f46e5);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: var(--radius-md);
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.35);
+    }
+    .btn-primary:hover { transform: translateY(-2px); filter: brightness(1.1); }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-main);
+      border: 1px solid var(--border-subtle);
+      padding: 10px 18px;
+      border-radius: var(--radius-md);
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.12); }
+
+    .chip {
+      padding: 6px 14px;
+      border-radius: 99px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .chip.active {
+      border-color: var(--accent-indigo);
+      background: rgba(99, 102, 241, 0.2);
+      color: #818cf8;
+    }
+
+    /* Typing Box Styling */
+    .typing-box-container {
+      position: relative;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      cursor: text;
+    }
+
+    .typing-box {
+      font-family: var(--font-mono);
+      font-size: 1.3rem;
+      line-height: 1.8;
+      min-height: 180px;
+      user-select: none;
+      word-break: break-word;
+      pointer-events: none;
+    }
+    .char-correct { color: var(--accent-emerald); font-weight: 700; }
+    .char-incorrect { color: var(--accent-rose); font-weight: 700; text-decoration: underline; }
+    .char-cursor { color: var(--accent-cursor); background: rgba(56, 189, 248, 0.25); border-radius: 2px; }
+    .char-untyped { color: rgba(255, 255, 255, 0.3); }
+
+    #hidden-input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      cursor: text;
+      border: none;
+      outline: none;
+      background: transparent;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container" id="app"></div>
+
+  <script>
+    const STORAGE_KEY = 'typing_arena_web_v2';
+
+    const PARAGRAPHS = {
+      EASY: [
+        "the quick brown fox jumps over the lazy dog every single morning without fail.",
+        "simple habits built day after day lead to great success over time.",
+        "focus on accuracy first then speed will naturally follow as you practice typing."
+      ],
+      MEDIUM: [
+        "Software development requires persistent learning, curiosity, and attention to subtle logic details.",
+        "Modern mobile applications deliver seamless experiences using reactive UI components and background synchronization.",
+        "Consistent daily typing practice enhances productivity, reduces cognitive friction, and sharpens mental focus."
+      ],
+      HARD: [
+        "System.out.println(\"WPM > 100!\"); // Accuracy: 99.8% | Latency: <15ms -- #TypingMaster_2026",
+        "Functional programming promotes immutability, pure functions, and monads like Optional<T> & Result<R>.",
+        "Regex pattern match: ^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,6}$ (validates 100% email formats!)."
+      ]
+    };
+
+    const BADGES = [
+      { id: 'b1', title: 'First Step', desc: 'Complete your first test.', target: 1, type: 'tests' },
+      { id: 'b2', title: 'Speed Demon', desc: 'Reach 50 WPM.', target: 50, type: 'wpm' },
+      { id: 'b3', title: 'Velocity Master', desc: 'Reach 80 WPM.', target: 80, type: 'wpm' },
+      { id: 'b4', title: 'Typing Legend', desc: 'Break 100 WPM!', target: 100, type: 'wpm' },
+      { id: 'b5', title: 'Sniper Precision', desc: 'Achieve 95% Accuracy.', target: 95, type: 'accuracy' },
+      { id: 'b6', title: 'Consistency Champ', desc: 'Complete 10 tests.', target: 10, type: 'tests' },
+      { id: 'b7', title: 'Marathoner', desc: 'Reach 150 WPM.', target: 150, type: 'wpm' },
+      { id: 'b8', title: 'Accuracy Master', desc: 'Achieve 99% Accuracy.', target: 99, type: 'accuracy' },
+      { id: 'b9', title: 'Long Typist', desc: 'Type 500 characters in a test.', target: 500, type: 'chars' }
+    ];
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return {
+        results: [],
+        bestWpm: 0,
+        unlockedBadges: [],
+        settings: { theme: 'DARK', difficulty: 'MEDIUM' }
+      };
+    }
+
+    let state = loadState();
+    function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+    // Test State
+    let activeView = 'home'; // 'home' | 'test' | 'results' | 'stats' | 'achievements' | 'settings' | 'practice'
+    let testDuration = 30;
+    let timeRemaining = 30;
+    let isPractice = false;
+    let isRunning = false;
+    let isFinished = false;
+    let timerInterval = null;
+
+    let targetText = '';
+    let userInput = '';
+    let mistakes = 0;
+    let currentWpm = 0;
+    let accuracy = 100;
+
+    function startTest(duration = 30, isPrac = false) {
+      testDuration = duration;
+      timeRemaining = duration;
+      isPractice = isPrac;
+      isRunning = false;
+      isFinished = false;
+      userInput = '';
+      mistakes = 0;
+      currentWpm = 0;
+      accuracy = 100;
+      if (timerInterval) clearInterval(timerInterval);
+
+      const list = PARAGRAPHS[state.settings.difficulty] || PARAGRAPHS.MEDIUM;
+      targetText = list[Math.floor(Math.random() * list.length)];
+
+      activeView = isPrac ? 'practice' : 'test';
+      render(true); // Full render on starting test
+      focusInput();
+    }
+
+    function focusInput() {
+      const inp = document.getElementById('hidden-input');
+      if (inp) {
+        inp.focus();
+        inp.selectionStart = inp.value.length;
+        inp.selectionEnd = inp.value.length;
+      }
+    }
+
+    function handleTyping(val) {
+      if (isFinished) return;
+
+      if (!isRunning && val.length > 0) {
+        isRunning = true;
+        if (!isPractice) {
+          timerInterval = setInterval(() => {
+            if (timeRemaining > 0) {
+              timeRemaining--;
+              calcMetrics();
+              updateTypingUI();
+            } else {
+              finishTest();
+            }
+          }, 1000);
+        }
+      }
+
+      userInput = val;
+      calcMetrics();
+
+      if (userInput.length >= targetText.length) {
+        finishTest();
+      } else {
+        updateTypingUI();
+      }
+
+      // Refocus the hidden input after handling typing to allow continuous input
+      focusInput();
+    }
+
+    function calcMetrics() {
+      let correctChars = 0;
+      for (let i = 0; i < userInput.length; i++) {
+        if (i < targetText.length && userInput[i] === targetText[i]) {
+          correctChars++;
+        }
+      }
+
+      const elapsedSec = Math.max(1, testDuration - timeRemaining);
+      const mins = elapsedSec / 60;
+      currentWpm = mins > 0 ? Math.round((correctChars / 5) / mins) : 0;
+      accuracy = userInput.length > 0 ? Math.round((correctChars / userInput.length) * 100) : 100;
+    }
+
+    function finishTest() {
+      if (timerInterval) clearInterval(timerInterval);
+      isRunning = false;
+      isFinished = true;
+
+      calcMetrics();
+
+      if (!isPractice) {
+        const result = {
+          wpm: currentWpm,
+          accuracy: accuracy,
+          timestamp: Date.now(),
+          duration: testDuration
+        };
+        state.results.unshift(result);
+        if (currentWpm > state.bestWpm) {
+          state.bestWpm = currentWpm;
+          if (window.confetti) confetti({ particleCount: 80, spread: 70 });
+        }
+
+        BADGES.forEach(b => {
+          if (!state.unlockedBadges.includes(b.id)) {
+            if (b.type === 'tests' && state.results.length >= b.target) state.unlockedBadges.push(b.id);
+            if (b.type === 'wpm' && state.bestWpm >= b.target) state.unlockedBadges.push(b.id);
+            if (b.type === 'accuracy' && accuracy >= b.target) state.unlockedBadges.push(b.id);
+          }
+        });
+
+        saveState();
+        activeView = 'results';
+      }
+
+      render(true);
+    }
+
+    function getPerformanceRating(wpm) {
+      if (wpm < 35) return { title: 'Beginner', color: '#94a3b8' };
+      if (wpm < 65) return { title: 'Intermediate', color: '#06b6d4' };
+      if (wpm < 95) return { title: 'Advanced', color: '#6366f1' };
+      return { title: 'Expert', color: '#f59e0b' };
+    }
+
+    // Fast in-place DOM update for character colors during typing without re-creating DOM
+    function updateTypingUI() {
+      const box = document.getElementById('typing-text-display');
+      const statTime = document.getElementById('stat-time');
+      const statWpm = document.getElementById('stat-wpm');
+      const statAcc = document.getElementById('stat-acc');
+
+      if (statTime) statTime.innerText = isPractice ? 'Unlimited' : timeRemaining + 's';
+      if (statWpm) statWpm.innerText = currentWpm + ' WPM';
+      if (statAcc) statAcc.innerText = accuracy + '%';
+
+      if (box) {
+        let charsHtml = '';
+        for (let i = 0; i < targetText.length; i++) {
+          if (i < userInput.length) {
+            const cls = userInput[i] === targetText[i] ? 'char-correct' : 'char-incorrect';
+            charsHtml += `<span class="${cls}">${escapeHtml(targetText[i])}</span>`;
+          } else if (i === userInput.length) {
+            charsHtml += `<span class="char-cursor">${escapeHtml(targetText[i])}</span>`;
+          } else {
+            charsHtml += `<span class="char-untyped">${escapeHtml(targetText[i])}</span>`;
+          }
+        }
+        box.innerHTML = charsHtml;
+      }
+    }
+
+    function escapeHtml(str) {
+      if (str === ' ') return '&nbsp;';
+      if (str === '<') return '&lt;';
+      if (str === '>') return '&gt;';
+      if (str === '&') return '&amp;';
+      return str;
+    }
+
+    function render(forceFull = false) {
+      const app = document.getElementById('app');
+      let html = '';
+
+      // HOME VIEW
+      if (activeView === 'home') {
+        html = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:28px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="width:40px; height:40px; border-radius:12px; background:linear-gradient(135deg, var(--accent-indigo), var(--accent-teal)); display:flex; align-items:center; justify-content:center;">
+                <i data-lucide="keyboard" style="color:white;"></i>
+              </div>
+              <h1 style="font-size:1.6rem; font-weight:900;">Typing Arena</h1>
+            </div>
+            <button onclick="activeView='settings'; render(true);" class="btn-secondary"><i data-lucide="settings"></i> Settings</button>
+          </div>
+
+          <div class="card" style="background:linear-gradient(135deg, rgba(99,102,241,0.15), rgba(6,182,212,0.1)); margin-bottom:20px;">
+            <div style="display:flex; align-items:center; gap:10px; color:#f59e0b; font-weight:700; margin-bottom:8px;">
+              <i data-lucide="trophy"></i> PERSONAL BEST
+            </div>
+            <div style="font-size:3.5rem; font-weight:900; color:var(--accent-indigo);">${state.bestWpm} WPM</div>
+            <p style="color:var(--text-muted); font-size:0.9rem;">Keep practicing daily to build muscle memory and speed!</p>
+          </div>
+
+          <button onclick="startTest(30)" class="btn-primary" style="width:100%; padding:16px; font-size:1.1rem; justify-content:center; margin-bottom:20px;">
+            <i data-lucide="play-arrow"></i> START TYPING TEST
+          </button>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
+            <div onclick="startTest(0, true)" class="card" style="cursor:pointer;">
+              <i data-lucide="timer-off" style="color:var(--accent-teal); margin-bottom:10px;"></i>
+              <div style="font-weight:800; font-size:1.1rem;">Practice Mode</div>
+              <div style="color:var(--text-muted); font-size:0.85rem;">Unlimited timer-free typing</div>
+            </div>
+            <div onclick="activeView='stats'; render(true);" class="card" style="cursor:pointer;">
+              <i data-lucide="bar-chart" style="color:#8b5cf6; margin-bottom:10px;"></i>
+              <div style="font-weight:800; font-size:1.1rem;">Statistics</div>
+              <div style="color:var(--text-muted); font-size:0.85rem;">Performance history & charts</div>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+            <div onclick="activeView='achievements'; render(true);" class="card" style="cursor:pointer;">
+              <i data-lucide="award" style="color:#f59e0b; margin-bottom:10px;"></i>
+              <div style="font-weight:800; font-size:1.1rem;">Achievements</div>
+              <div style="color:var(--text-muted); font-size:0.85rem;">Badges & milestones</div>
+            </div>
+            <div onclick="startTest(60)" class="card" style="cursor:pointer;">
+              <i data-lucide="calendar" style="color:var(--accent-emerald); margin-bottom:10px;"></i>
+              <div style="font-weight:800; font-size:1.1rem;">Daily Challenge</div>
+              <div style="color:var(--text-muted); font-size:0.85rem;">Special 60s prompt</div>
+            </div>
+          </div>
+        `;
+      }
+
+      // TEST & PRACTICE VIEWS
+      else if (activeView === 'test' || activeView === 'practice') {
+        html = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <button onclick="activeView='home'; render(true);" class="btn-secondary"><i data-lucide="arrow-left"></i> Home</button>
+            <div style="display:flex; gap:8px;">
+              ${!isPractice ? `
+                <button onclick="startTest(15)" class="chip ${testDuration===15?'active':''}">15s</button>
+                <button onclick="startTest(30)" class="chip ${testDuration===30?'active':''}">30s</button>
+                <button onclick="startTest(60)" class="chip ${testDuration===60?'active':''}">60s</button>
+                <button onclick="startTest(120)" class="chip ${testDuration===120?'active':''}">120s</button>
+              ` : ''}
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; margin-bottom:20px;">
+            <div class="card" style="text-align:center; padding:16px;">
+              <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">${isPractice?'STATUS':'TIME'}</div>
+              <div id="stat-time" style="font-size:1.5rem; font-weight:800; color:var(--accent-indigo);">${isPractice?'Unlimited':timeRemaining+'s'}</div>
+            </div>
+            <div class="card" style="text-align:center; padding:16px;">
+              <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">SPEED</div>
+              <div id="stat-wpm" style="font-size:1.5rem; font-weight:800; color:var(--accent-teal);">${currentWpm} WPM</div>
+            </div>
+            <div class="card" style="text-align:center; padding:16px;">
+              <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">ACCURACY</div>
+              <div id="stat-acc" style="font-size:1.5rem; font-weight:800; color:var(--accent-emerald);">${accuracy}%</div>
+            </div>
+          </div>
+
+          <div class="typing-box-container" onclick="focusInput()">
+            <div id="typing-text-display" class="typing-box"></div>
+            <input id="hidden-input" type="text" oninput="handleTyping(this.value)" onblur="focusInput()" autocomplete="off" />
+          </div>
+
+          <div style="text-align:center; color:var(--text-muted); font-size:0.9rem; margin-top:16px;">
+            Click anywhere inside the text box and start typing! Press Backspace to fix mistakes.
+          </div>
+        `;
+      }
+
+      // RESULTS VIEW
+      else if (activeView === 'results') {
+        const rating = getPerformanceRating(currentWpm);
+        html = `
+          <div class="card" style="text-align:center; padding:40px 20px; margin-bottom:24px;">
+            <span style="background:${rating.color}22; color:${rating.color}; font-weight:800; padding:6px 16px; border-radius:99px; font-size:0.85rem; display:inline-block; margin-bottom:12px;">
+              ${rating.title.toUpperCase()}
+            </span>
+            <div style="font-size:4.5rem; font-weight:900; color:var(--accent-indigo);">${currentWpm}</div>
+            <div style="color:var(--text-muted); font-weight:700; font-size:0.85rem; margin-bottom:24px;">WORDS PER MINUTE</div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; text-align:left; max-width:500px; margin:0 auto 24px;">
+              <div style="padding:14px; background:rgba(255,255,255,0.03); border-radius:12px;">
+                <div style="font-size:0.8rem; color:var(--text-muted);">Accuracy</div>
+                <div style="font-size:1.3rem; font-weight:800; color:var(--accent-emerald);">${accuracy}%</div>
+              </div>
+              <div style="padding:14px; background:rgba(255,255,255,0.03); border-radius:12px;">
+                <div style="font-size:0.8rem; color:var(--text-muted);">Characters Typed</div>
+                <div style="font-size:1.3rem; font-weight:800;">${userInput.length}</div>
+              </div>
+            </div>
+
+            <div style="display:flex; justify-content:center; gap:12px;">
+              <button onclick="startTest(${testDuration})" class="btn-primary"><i data-lucide="rotate-ccw"></i> Retry Test</button>
+              <button onclick="activeView='home'; render(true);" class="btn-secondary"><i data-lucide="home"></i> Home</button>
+            </div>
+          </div>
+        `;
+      }
+
+      // STATS VIEW
+      else if (activeView === 'stats') {
+        const totalTests = state.results.length;
+        const avgWpm = totalTests > 0 ? Math.round(state.results.reduce((a,b)=>a+b.wpm,0)/totalTests) : 0;
+        const avgAcc = totalTests > 0 ? Math.round(state.results.reduce((a,b)=>a+b.accuracy,0)/totalTests) : 0;
+
+        html = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <button onclick="activeView='home'; render(true);" class="btn-secondary"><i data-lucide="arrow-left"></i> Back</button>
+            <h2 style="font-size:1.3rem; font-weight:800;">Statistics</h2>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px;">
+            <div class="card"><div style="color:var(--text-muted); font-size:0.85rem;">Highest WPM</div><div style="font-size:2rem; font-weight:800; color:var(--accent-indigo);">${state.bestWpm}</div></div>
+            <div class="card"><div style="color:var(--text-muted); font-size:0.85rem;">Average WPM</div><div style="font-size:2rem; font-weight:800; color:var(--accent-teal);">${avgWpm}</div></div>
+            <div class="card"><div style="color:var(--text-muted); font-size:0.85rem;">Avg Accuracy</div><div style="font-size:2rem; font-weight:800; color:var(--accent-emerald);">${avgAcc}%</div></div>
+            <div class="card"><div style="color:var(--text-muted); font-size:0.85rem;">Tests Completed</div><div style="font-size:2rem; font-weight:800; color:#8b5cf6;">${totalTests}</div></div>
+          </div>
+        `;
+      }
+
+      // ACHIEVEMENTS VIEW
+      else if (activeView === 'achievements') {
+        html = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <button onclick="activeView='home'; render(true);" class="btn-secondary"><i data-lucide="arrow-left"></i> Back</button>
+            <h2 style="font-size:1.3rem; font-weight:800;">Achievements</h2>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:14px;">
+            ${BADGES.map(b => {
+              const unlocked = state.unlockedBadges.includes(b.id);
+              return `
+                <div class="card" style="opacity:${unlocked?1:0.5};">
+                  <i data-lucide="${unlocked?'award':'lock'}" style="color:${unlocked?'var(--accent-emerald)':'var(--text-muted)'}; margin-bottom:10px;"></i>
+                  <div style="font-weight:800; font-size:1rem;">${b.title}</div>
+                  <div style="color:var(--text-muted); font-size:0.85rem; margin-top:4px;">${b.desc}</div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      }
+
+      // SETTINGS VIEW
+      else if (activeView === 'settings') {
+        html = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <button onclick="activeView='home'; render(true);" class="btn-secondary"><i data-lucide="arrow-left"></i> Back</button>
+            <h2 style="font-size:1.3rem; font-weight:800;">Settings</h2>
+          </div>
+
+          <div class="card" style="margin-bottom:14px;">
+            <div style="font-weight:800; margin-bottom:12px;">Difficulty Level</div>
+            <div style="display:flex; gap:10px;">
+              <button onclick="state.settings.difficulty='EASY'; saveState(); render(true);" class="chip ${state.settings.difficulty==='EASY'?'active':''}">Easy</button>
+              <button onclick="state.settings.difficulty='MEDIUM'; saveState(); render(true);" class="chip ${state.settings.difficulty==='MEDIUM'?'active':''}">Medium</button>
+              <button onclick="state.settings.difficulty='HARD'; saveState(); render(true);" class="chip ${state.settings.difficulty==='HARD'?'active':''}">Hard</button>
+            </div>
+          </div>
+
+          <button onclick="if(confirm('Reset all statistics?')){state.results=[]; state.bestWpm=0; state.unlockedBadges=[]; saveState(); render(true);}" class="btn-secondary" style="color:var(--accent-rose); border-color:var(--accent-rose);">
+            Reset All Statistics
+          </button>
+        `;
+      }
+
+      app.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
+
+      if (activeView === 'test' || activeView === 'practice') {
+        updateTypingUI();
+      }
+    }
+
+    render(true);
+  </script>
+</body>
+</html>
